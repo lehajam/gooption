@@ -20,15 +20,16 @@
         "operationId": "Price",
         "responses": {
           "200": {
-            "description": "A successful response.",
+            "description": "A successful response.(streaming responses)",
             "schema": {
-              "$ref": "#/definitions/gobsPriceResponse"
+              "$ref": "#/x-stream-definitions/gobsPriceResponse"
             }
           }
         },
         "parameters": [
           {
             "name": "body",
+            "description": " (streaming inputs)",
             "in": "body",
             "required": true,
             "schema": {
@@ -43,21 +44,6 @@
     }
   },
   "definitions": {
-    "gobsGreek": {
-      "type": "object",
-      "properties": {
-        "label": {
-          "type": "string"
-        },
-        "value": {
-          "type": "number",
-          "format": "double"
-        },
-        "error": {
-          "type": "string"
-        }
-      }
-    },
     "gobsPriceRequest": {
       "type": "object",
       "properties": {
@@ -93,17 +79,68 @@
     "gobsPriceResponse": {
       "type": "object",
       "properties": {
-        "price": {
+        "value": {
           "type": "number",
           "format": "double"
         },
-        "greeks": {
+        "value_type": {
+          "type": "string"
+        },
+        "error": {
+          "type": "string"
+        }
+      }
+    },
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "type_url": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string",
+          "format": "byte"
+        }
+      }
+    },
+    "runtimeStreamError": {
+      "type": "object",
+      "properties": {
+        "grpc_code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "http_code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "http_status": {
+          "type": "string"
+        },
+        "details": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/gobsGreek"
+            "$ref": "#/definitions/protobufAny"
           }
         }
       }
+    }
+  },
+  "x-stream-definitions": {
+    "gobsPriceResponse": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "$ref": "#/definitions/gobsPriceResponse"
+        },
+        "error": {
+          "$ref": "#/definitions/runtimeStreamError"
+        }
+      },
+      "title": "Stream result of gobsPriceResponse"
     }
   }
 }

@@ -8,7 +8,7 @@ option go_package = "gobs/api;api_pb";
 import "google/api/annotations.proto";
 
 service PricerService {
-    rpc Price (PriceRequest) returns (PriceResponse) {
+    rpc Price (stream PriceRequest) returns (stream PriceResponse) {
         option (google.api.http) = {
             post: "/price"
             body: "*"
@@ -27,12 +27,7 @@ message PriceRequest {
 }
 
 message PriceResponse {
-  double price = 2;
-  repeated Greek greeks = 3;
-}
-
-message Greek {
-  string label = 1;
-  double value = 2;
+  double value = 1;
+  string value_type = 2;
   string error = 3;
 }

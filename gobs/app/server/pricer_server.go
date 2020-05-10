@@ -1,9 +1,7 @@
 package server
 
 import (
-	"context"
-	"encoding/json"
-	"fmt"
+	"io"
 	"math"
 	"strings"
 	"time"
@@ -50,52 +48,38 @@ Black Scholes Greeks : https://en.wikipedia.org/wiki/Black%E2%80%93Scholes_model
 Possible values for Requests :  "all", "delta", "gamma", "vega", "theta", "rho"
 Setting Request to "all" will compute all greeks
 */
-func (srv *pricerServiceServerImpl) Price(ctx context.Context, req *api_pb.PriceRequest) (*api_pb.PriceResponse, error) {
-	var (
-		s = req.Spot
-		v = req.Vol
-		r = req.Rate
-		k = req.Strike
-		t = time.Unix(int64(req.Expiry), 0).Sub(
-			time.Unix(int64(req.Pricingdate), 0)).Hours() / 24.0 / 365.250
-
-		mult = mapToMultiplier[strings.ToLower(req.PutCall)]
-	)
-
-	jreq, _ := json.MarshalIndent(req, "", "\t")
-	fmt.Printf("%s \n", jreq)
-
-	d1 := d1(s, k, t, v, r)
-	d2 := d2(d1, v, t)
-
-	greeks := make([]*api_pb.Greek, len(allGreeks))
-	for index, name := range allGreeks {
-		greek := &api_pb.Greek{
-			Label: name,
+func (srv *pricerServiceServerImpl) Price(stream api_pb.PricerService_PriceServer) error {
+	for {
+		req, err := stream.Recv()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
 		}
 
-		switch name {
-		case "delta":
-			greek.Value = delta(d1, mult)
-		case "gamma":
-			greek.Value = gamma(s, t, v, d1)
-		case "vega":
-			greek.Value = vega(s, t, d1)
-		case "theta":
-			greek.Value = theta(s, k, t, v, r, d1, d2, mult)
-		case "rho":
-			greek.Value = rho(k, t, r, d2, mult)
-		default:
-			greek.Error = "Unknown greek " + name
+		// get inputs
+		s, v, k, r := req.Spot, req.Vol, req.Strike, req.Rate
+		t := time.Unix(int64(req.Expiry), 0).Sub(time.Unix(int64(req.Pricingdate), 0)).Hours() / 24.0 / 365.250
+		mult := mapToMultiplier[strings.ToLower(req.PutCall)]
+
+		d1 := d1(s, k, t, v, r)
+		d2 := d2(d1, v, t)
+
+		results := map[string]float64{
+			"price": bs(s, v, r, k, t, mult),
+			"delta": delta(d1, mult),
+			"vega":  vega(s, t, d1),
+			"gamma": gamma(s, t, v, d1),
+			"rho":   rho(k, t, r, d2, mult),
 		}
 
-		greeks[index] = greek
+		for valueType, value := range results {
+			if err := stream.Send(&api_pb.PriceResponse{Value: value, ValueType: valueType}); err != nil {
+				return err
+			}
+		}
 	}
-
-	return &api_pb.PriceResponse{
-		Price:  bs(s, v, r, k, t, mult),
-		Greeks: greeks,
-	}, nil
 }
 
 /*
