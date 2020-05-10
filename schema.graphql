@@ -1,0 +1,66 @@
+interface Index {
+	id: ID!
+	quotes: [Quote] @hasInverse(field: index)
+	contracts: [Contract] @hasInverse(field: index)
+}
+
+interface Quote {
+	id: ID!
+	datePublished: DateTime @search
+	index: Index!
+}
+
+interface Contract {
+	ticker: String! @id @search(by: [hash])
+	index: [Index]
+	currency: String!
+	trades: [Trade] @hasInverse(field: contract)
+}
+
+type StockQuote implements Quote {
+	open: Float
+	close: Float!
+	volume: Float
+	low: Float
+	high: Float
+}
+
+type Stock implements Index {
+	ticker: String! @search(by: [hash]) @id
+}
+
+type EuropeanContract implements Contract {
+	strike: Float!
+	putcall: String!
+	expiry: DateTime! @search
+}
+
+type Trade {
+	id: ID!
+	tradeDate: DateTime! @search
+	quantity: Float!
+	contract: Contract!
+	trader: Trader!
+	book: Book
+}
+
+type Book {
+	name: String! @search(by: [hash])  @id
+	trades: [Trade] @hasInverse(field: book)
+	traders: [Trader]
+}
+
+interface User {
+	name: String! @search(by: [hash])  @id
+}
+
+type Trader implements User {
+	books: [Book] @hasInverse(field: traders)
+	trades: [Trade] @hasInverse(field: trader)
+	office: Office
+}
+
+type Office {
+	name: String! @search(by: [hash])  @id
+	traders: [Trader] @hasInverse(field: office)
+}

@@ -1,0 +1,68 @@
+mutation {
+  # AAPL stock
+  addStock(input: [
+    { ticker: "AAPL" }
+  ]) {
+    stock {
+      id
+    }
+  }
+
+  # london office
+  addOffice(input: [{name: "london"}]){
+    office {
+      name
+    }
+  }
+
+  # autocall book
+  addBook(input: [{name: "autocall"}]) {
+    book {
+      name
+    }
+  }
+
+  # trader
+  addTrader(input: [
+    {name: "lehajam boujemaoui", books: [{name: "autocall"}], office: {name: "london"}}
+  ]){
+    trader {
+      name
+    }
+  }
+
+  # AAPL quotes
+  addStockQuote(input: [
+    { index: { id: "0x2" }, datePublished: "2019-10-01", close: 100.0},
+    { index: { id: "0x2" }, datePublished: "2019-10-02", close: 101.0},
+    { index: { id: "0x2" }, datePublished: "2019-10-03", close: 102.0},
+    { index: { id: "0x2" }, datePublished: "2019-10-04", close: 103.0},
+    { index: { id: "0x2" }, datePublished: "2019-10-05", close: 100.0},
+  ]) {
+    stockquote {
+      id
+    }
+  }
+
+  # european options on AAPL
+  addEuropeanContract(input: [
+    {ticker: "AAPL DEC2020", index: [{ id: "0x2" }], currency: "EUR", strike: 100.0, expiry: "2020-12-01", putcall: "call"},
+    {ticker: "AAPL DEC2021", index: [{ id: "0x2" }], currency: "EUR", strike: 100.0, expiry: "2020-12-01", putcall: "call"},
+    {ticker: "AAPL DEC2022", index: [{ id: "0x2" }], currency: "EUR", strike: 100.0, expiry: "2020-12-01", putcall: "call"},
+  ]) {
+    europeancontract {
+      ticker
+    }
+  }
+
+  # trades on AAPL european options
+  addTrade(input: [
+    {tradeDate:"2019-10-01", quantity:1000, contract: { ticker: "AAPL DEC2020" }, trader: { name: "lehajam boujemaoui"}, book: {name: "autocall"}},
+    {tradeDate:"2019-10-01", quantity:1000, contract: { ticker: "AAPL DEC2021" }, trader: { name: "lehajam boujemaoui"}, book: {name: "autocall"}},
+    {tradeDate:"2019-10-01", quantity:1000, contract: { ticker: "AAPL DEC2022" }, trader: { name: "lehajam boujemaoui"}, book: {name: "autocall"}},
+  ]){
+    trade {
+      id
+    }
+  }
+}
