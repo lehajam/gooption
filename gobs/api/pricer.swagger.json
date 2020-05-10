@@ -1,0 +1,109 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "pricer.proto",
+    "version": "version not set"
+  },
+  "schemes": [
+    "http",
+    "https"
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/price": {
+      "post": {
+        "operationId": "Price",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/gobsPriceResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/gobsPriceRequest"
+            }
+          }
+        ],
+        "tags": [
+          "PricerService"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "gobsGreek": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "value": {
+          "type": "number",
+          "format": "double"
+        },
+        "error": {
+          "type": "string"
+        }
+      }
+    },
+    "gobsPriceRequest": {
+      "type": "object",
+      "properties": {
+        "pricingdate": {
+          "type": "number",
+          "format": "double"
+        },
+        "strike": {
+          "type": "number",
+          "format": "double"
+        },
+        "expiry": {
+          "type": "number",
+          "format": "double"
+        },
+        "put_call": {
+          "type": "string"
+        },
+        "spot": {
+          "type": "number",
+          "format": "double"
+        },
+        "vol": {
+          "type": "number",
+          "format": "double"
+        },
+        "rate": {
+          "type": "number",
+          "format": "double"
+        }
+      }
+    },
+    "gobsPriceResponse": {
+      "type": "object",
+      "properties": {
+        "price": {
+          "type": "number",
+          "format": "double"
+        },
+        "greeks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/gobsGreek"
+          }
+        }
+      }
+    }
+  }
+}

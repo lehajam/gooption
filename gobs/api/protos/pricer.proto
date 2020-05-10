@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package gooption.gobs;
+
+option go_package = "gobs/api;api_pb";
+
+
+import "google/api/annotations.proto";
+
+service PricerService {
+    rpc Price (PriceRequest) returns (PriceResponse) {
+        option (google.api.http) = {
+            post: "/price"
+            body: "*"
+        };
+    }
+}
+
+message PriceRequest {
+  double pricingdate = 1;
+  double strike = 2;
+  double expiry = 3;
+  string put_call = 4;
+  double spot = 5;
+  double vol = 6;
+  double rate = 7;
+}
+
+message PriceResponse {
+  double price = 2;
+  repeated Greek greeks = 3;
+}
+
+message Greek {
+  string label = 1;
+  double value = 2;
+  string error = 3;
+}
