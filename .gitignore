@@ -3,3 +3,4 @@ debug.*
 local
 bin
 .idea
+node_modules

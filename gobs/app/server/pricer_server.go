@@ -1,6 +1,8 @@
 package server
 
 import (
+	"encoding/json"
+	"fmt"
 	"io"
 	"math"
 	"strings"
@@ -12,17 +14,10 @@ import (
 	api_pb "gobs/api"
 )
 
-const (
-	ivSeed    = 0.1 // solver starting point
-	maxIter   = 1000
-	putLBound = 0.20
-)
-
 var (
 	phi             = distuv.Normal{Mu: 0, Sigma: 1}.CDF
 	dphi            = distuv.Normal{Mu: 0, Sigma: 1}.Prob
 	mapToMultiplier = map[string]float64{"call": 1.0, "put": -1.0}
-	allGreeks       = []string{"delta", "gamma", "vega", "theta", "rho"}
 )
 
 // PricerServiceServer is a composite interface of api_pb.PricerServiceServer and grapiserver.Server.
@@ -57,6 +52,9 @@ func (srv *pricerServiceServerImpl) Price(stream api_pb.PricerService_PriceServe
 		if err != nil {
 			return err
 		}
+
+		jreq, _ := json.MarshalIndent(req, "", "\t")
+		fmt.Printf("%s \n", jreq)
 
 		// get inputs
 		s, v, k, r := req.Spot, req.Vol, req.Strike, req.Rate

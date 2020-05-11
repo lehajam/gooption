@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package gooption.gobs;
+package gobs;
 
 option go_package = "gobs/api;api_pb";
 

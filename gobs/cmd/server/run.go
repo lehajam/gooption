@@ -13,6 +13,7 @@ func run() error {
 	ctx := appctx.Global()
 
 	s := grapiserver.New(
+		grapiserver.WithGrpcAddr("tcp", ":5050"),
 		grapiserver.WithDefaultLogger(),
 		grapiserver.WithServers(
 			server.NewPricerServiceServer(),
