@@ -73,7 +73,8 @@ func (srv *pricerServiceServerImpl) Price(stream api_pb.PricerService_PriceServe
 		}
 
 		for valueType, value := range results {
-			if err := stream.Send(&api_pb.PriceResponse{Value: value, ValueType: valueType}); err != nil {
+			response := &api_pb.PriceResponse{ Value: value, ValueType: valueType, ClientId: req.ClientId }
+			if err := stream.Send(response); err != nil {
 				return err
 			}
 		}

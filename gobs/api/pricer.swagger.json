@@ -73,6 +73,9 @@
         "rate": {
           "type": "number",
           "format": "double"
+        },
+        "client_id": {
+          "type": "string"
         }
       }
     },
@@ -87,6 +90,9 @@
           "type": "string"
         },
         "error": {
+          "type": "string"
+        },
+        "client_id": {
           "type": "string"
         }
       }
