@@ -65,4 +65,16 @@ mutation {
       id
     }
   }
+
+  # AAPL quotes
+  addPriceResult(input: [
+    {datePublished:"2020-05-11", contract: { ticker: "AAPL DEC2020" }, value: 1, resultType: "price", source: "gobs"},
+    {datePublished:"2020-05-11", contract: { ticker: "AAPL DEC2020" }, value: 0.5, resultType: "delta", source: "gobs"},
+    {datePublished:"2020-05-11", contract: { ticker: "AAPL DEC2021" }, value: 2, resultType: "price", source: "gobs"},
+    {datePublished:"2020-05-11", contract: { ticker: "AAPL DEC2021" }, value: 1, resultType: "delta", source: "gobs"},
+  ]) {
+     priceresult{
+      id
+    }
+  }
 }

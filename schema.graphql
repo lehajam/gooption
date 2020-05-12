@@ -15,6 +15,7 @@ interface Contract {
 	index: [Index]
 	currency: String!
 	trades: [Trade] @hasInverse(field: contract)
+	results: [PriceResult] @hasInverse(field: contract)
 }
 
 type StockQuote implements Quote {
@@ -63,4 +64,13 @@ type Trader implements User {
 type Office {
 	name: String! @search(by: [hash])  @id
 	traders: [Trader] @hasInverse(field: office)
+}
+
+type PriceResult {
+	id: ID!
+	datePublished: DateTime @search
+	contract: Contract!
+	value: Float!
+	resultType: String! @search(by: [hash])
+	source: String! @search(by: [hash])
 }

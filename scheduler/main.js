@@ -10,7 +10,7 @@ var pricer = newPricer();
 setInterval(function(){
     console.log('Pricing all trades...');
 
-    fetch("https://c14f96ce.ngrok.io/graphql", {
+    fetch("http://localhost:8080/graphql", {
         "method": "POST",
         "headers": {
           "content-type": "application/json"
@@ -42,10 +42,32 @@ setInterval(function(){
         var price = pricer.Price();
 
         price.on('data', function(response) {
-          console.log(
-            "contract:" + response.client_id + '\t' +
-            "type: " + response.value_type + '\t' +
-            "value: " + response.value);
+
+          var timestamp = (new Date()).toISOString();
+          console.log(`contract:${response.client_id}\ttype:${response.value_type}\tvalue:${response.value}`);
+          fetch("http://localhost:8080/graphql", {
+            "method": "POST",
+            "headers": {
+              "content-type": "application/json"
+            },
+            "body": JSON.stringify({ query: `mutation {
+              addPriceResult(input: [{
+                datePublished:"${timestamp}",
+                contract: { ticker: "${response.client_id}" },
+                value: ${response.value},
+                resultType: "${response.value_type}",
+                source: "gobs"
+              }]) {
+                priceresult {
+                  id
+                  value
+                }
+            }}`})
+          })
+          .then(res => res.json())
+          .then(json => {
+            console.log('inserted row');
+          });
         });
 
         price.on('error', function(e) {
@@ -57,8 +79,7 @@ setInterval(function(){
             price.end();
         });
 
-        const now = new Date();
-        const pricingdate = Math.round(now.getTime() / 1000);  // always in UTC
+        const pricingdate = Math.round((new Date()).getTime() / 1000);  // always in UTC
         jsonres.data.queryTrade.forEach(function(trade){
             price.write({
                 client_id: trade.contract.ticker,
@@ -73,7 +94,6 @@ setInterval(function(){
         });
 
         price.end();
-
     })
     .catch(err => {
         console.log(err);
