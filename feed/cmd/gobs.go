@@ -16,6 +16,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -38,7 +39,84 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		feed()
+
+		graphqlAddr, err := cmd.Flags().GetString("graphql")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		gobsAddr, err := cmd.Flags().GetString("gobs")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		tick, err := cmd.Flags().GetInt64("tick")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		client := graphql.NewClient(graphqlAddr)
+		for _ = range time.Tick(time.Duration(tick) * time.Second) {
+			var queryTradeResp QueryTradeResponse
+			err := graphQuery(client, `{
+				queryTrade {
+					contract {
+						ticker
+						index {
+							quotes (order: { desc: datePublished }, first: 1) {
+								... on StockQuote {
+									datePublished
+									close
+								}
+							}
+						}
+						... on EuropeanContract {
+							strike
+							expiry
+							putcall
+						}
+					}
+				}
+			}`, nil, &queryTradeResp)
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
+
+			stream, conn, err := newGobsStream(gobsAddr)
+			if conn != nil {
+				defer conn.Close()
+			}
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+
+			waitc := make(chan struct{})
+			go gobsResponseHandler(client, waitc, stream)
+
+			for _, trade := range queryTradeResp.QueryTrade {
+				err = stream.Send(&api_pb.PriceRequest{
+					ClientId:    trade.Contract.Ticker,
+					Pricingdate: float64(time.Now().Unix()),
+					Strike:      trade.Contract.Strike,
+					PutCall:     trade.Contract.Putcall,
+					Expiry:      float64(trade.Contract.Expiry.Unix()),
+					Spot:        trade.Contract.Index[0].Quotes[0].Close,
+					Vol:         0.1,
+					Rate:        0.01,
+				})
+				if err != nil {
+					log.Fatalf("Failed to send a price request: %v", err)
+				}
+			}
+
+			stream.CloseSend()
+			<-waitc
+		}
 	},
 }
 
@@ -53,131 +131,9 @@ func init() {
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	// gobsCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-}
-
-func feed() {
-
-	client := graphql.NewClient("http://localhost:8080/graphql")
-
-	// make a request
-	req := graphql.NewRequest(`{
-		queryTrade {
-			contract {
-				ticker
-				index {
-					quotes (order: { desc: datePublished }, first: 1) {
-						... on StockQuote {
-							datePublished
-							close
-						}
-					}
-				}
-				... on EuropeanContract {
-					strike
-					expiry
-					putcall
-				}
-			}
-		}
-	}`)
-
-	// set header fields
-	req.Header.Set("Cache-Control", "no-cache")
-
-	// define a Context for the request
-	ctx := context.Background()
-
-	// run it and capture the response
-	var resp QueryTradeResponse
-	err := client.Run(ctx, req, &resp)
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-
-	// jreq, _ := json.MarshalIndent(resp, "", "\t")
-	// fmt.Printf("%s \n", jreq)
-
-	conn, err := grpc.Dial(":5050", grpc.WithInsecure())
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	defer conn.Close()
-
-	grpcClient := api_pb.NewPricerServiceClient(conn)
-	stream, err := grpcClient.Price(context.Background())
-	waitc := make(chan struct{})
-	go func() {
-		for {
-			resp, err := stream.Recv()
-			if err == io.EOF {
-				// read done.
-				close(waitc)
-				return
-			}
-			if err != nil {
-				log.Fatalf("Failed to receive a note : %v", err)
-			}
-
-			// jreq, _ = json.MarshalIndent(resp, "", "\t")
-			// fmt.Printf("%s \n", jreq)
-
-			// make a request
-			req = graphql.NewRequest(`mutation ($timestamp: DateTime!, $contractID: String!, $value: Float!, $type: String!, $source: String!) {
-				addPriceResult(input: [{
-					datePublished: $timestamp,
-					contract: { ticker: $contractID },
-					value: $value,
-					resultType: $type,
-					source: $source
-				}]) {
-					priceresult {
-						id
-						value
-					}
-				}
-			}`)
-
-			// set any variables
-			req.Var("timestamp", time.Now())
-			req.Var("contractID", resp.ClientId)
-			req.Var("value", resp.Value)
-			req.Var("type", resp.ValueType)
-			req.Var("source", "gobs")
-
-			// set header fields
-			req.Header.Set("Cache-Control", "no-cache")
-
-			// run it and capture the response
-			obj := &PriceResultMutaionResponse{}
-			err = client.Run(ctx, req, obj)
-			if err != nil {
-				fmt.Println(err.Error())
-			}
-
-			// jreq, _ = json.MarshalIndent(obj, "", "\t")
-			// fmt.Printf("%s \n", jreq)
-		}
-	}()
-
-	for _, trade := range resp.QueryTrade {
-		err = stream.Send(&api_pb.PriceRequest{
-			ClientId:    trade.Contract.Ticker,
-			Pricingdate: float64(time.Now().Unix()),
-			Strike:      trade.Contract.Strike,
-			PutCall:     trade.Contract.Putcall,
-			Expiry:      float64(trade.Contract.Expiry.Unix()),
-			Spot:        trade.Contract.Index[0].Quotes[0].Close,
-			Vol:         0.1,
-			Rate:        0.01,
-		})
-		if err != nil {
-			log.Fatalf("Failed to send a price request: %v", err)
-		}
-	}
-	stream.CloseSend()
-	<-waitc
+	gobsCmd.Flags().String("graphql", "http://localhost:8080/graphql", "graphql server URL")
+	gobsCmd.Flags().String("gobs", ":5050", "gobs URL")
+	gobsCmd.Flags().Int64("tick", 10, "the time interval in seconds between")
 }
 
 type QueryTradeResponse struct {
@@ -203,4 +159,78 @@ type PriceResultMutaionResponse struct {
 			ID string `json:"id"`
 		} `json:"priceresult"`
 	} `json:"addPriceResult"`
+}
+
+func graphQuery(client *graphql.Client, queryString string, vars map[string]interface{}, response interface{}) error {
+	// make a request
+	req := graphql.NewRequest(queryString)
+
+	// set header fields
+	req.Header.Set("Cache-Control", "no-cache")
+
+	if vars != nil {
+		for k, v := range vars {
+			req.Var(k, v)
+		}
+	}
+
+	// run it and capture the response
+	err := client.Run(context.Background(), req, response)
+	if err != nil {
+		return err
+	}
+
+	jreq, _ := json.MarshalIndent(response, "", "\t")
+	fmt.Printf("%s \n", jreq)
+
+	return nil
+}
+
+func newGobsStream(grpcAddress string) (api_pb.PricerService_PriceClient, *grpc.ClientConn, error) {
+	conn, err := grpc.Dial(grpcAddress, grpc.WithInsecure())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	grpcClient := api_pb.NewPricerServiceClient(conn)
+	stream, err := grpcClient.Price(context.Background())
+	if err != nil {
+		return nil, conn, err
+	}
+
+	return stream, conn, nil
+}
+
+func gobsResponseHandler(client *graphql.Client, waitc chan struct{}, stream api_pb.PricerService_PriceClient) {
+	for {
+		resp, err := stream.Recv()
+		if err == io.EOF {
+			// read done.
+			close(waitc)
+			return
+		}
+		if err != nil {
+			log.Fatalf("Failed to receive a result : %v", err)
+		}
+
+		var mutationResp PriceResultMutaionResponse
+		vars := map[string]interface{}{"timestamp": time.Now(), "contractID": resp.ClientId, "value": resp.Value, "type": resp.ValueType, "source": "gobs"}
+		err = graphQuery(client, `mutation ($timestamp: DateTime!, $contractID: String!, $value: Float!, $type: String!, $source: String!) {
+			addPriceResult(input: [{
+				datePublished: $timestamp,
+				contract: { ticker: $contractID },
+				value: $value,
+				resultType: $type,
+				source: $source
+			}]) {
+				priceresult {
+					id
+					value
+				}
+			}
+		}`, vars, &mutationResp)
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+	}
 }
