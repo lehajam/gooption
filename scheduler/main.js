@@ -10,7 +10,7 @@ setInterval(function(){
         const priceRequests = queryResponse.data.queryTrade.map(helpers.newPriceRequest);
         helpers.grpcStreamQuery(pricer.Price(), priceRequests, function(response) {
             console.log(`contract:${response.client_id}\ttype:${response.value_type}\tvalue:${response.value}`);
-            helpers.graphQuery("http://localhost:8080/graphql", queries.priceResultMutation(response.client_id, response.value, response.value_type));
+            helpers.graphQuery("http://localhost:8080/graphql", queries.priceResultMutation(response.client_id, response.value, response.value_type, "gobs"));
           });
       }
     );

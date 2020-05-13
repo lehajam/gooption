@@ -11,7 +11,7 @@ import (
 	"github.com/izumin5210/grapi/pkg/grapiserver"
 	"gonum.org/v1/gonum/stat/distuv"
 
-	api_pb "gobs/api"
+	api_pb "github.com/lehajam/gooption/gobs/api"
 )
 
 var (
@@ -73,7 +73,7 @@ func (srv *pricerServiceServerImpl) Price(stream api_pb.PricerService_PriceServe
 		}
 
 		for valueType, value := range results {
-			response := &api_pb.PriceResponse{ Value: value, ValueType: valueType, ClientId: req.ClientId }
+			response := &api_pb.PriceResponse{Value: value, ValueType: valueType, ClientId: req.ClientId}
 			if err := stream.Send(response); err != nil {
 				return err
 			}

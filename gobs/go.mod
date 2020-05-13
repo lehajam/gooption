@@ -1,4 +1,4 @@
-module gobs
+module github.com/lehajam/gooption/gobs
 
 go 1.14
 

@@ -48,27 +48,30 @@ function graphQuery(url, queryString, callback, errHandler) {
 }
 
 function grpcStreamQuery(stub, requests, callback, errHandler, endHandler) {
-  stub.on('data', callback);
+    stub.on('data', function(response) {
+        console.log(JSON.stringify(response));
+        callback(response);
+    });
 
-  stub.on('error', function(err){
-    console.json(JSON.stringify(err));
-    if(errHandler && typeof errHandler === "function") {
-      errHandler(err);
-    }
-  });
+    stub.on('error', function(err){
+        console.log(JSON.stringify(err));
+        if(errHandler && typeof errHandler === "function") {
+            errHandler(err);
+        }
+    });
 
-  stub.on('end', function(){
-    if(endHandler && typeof endHandler === "function") {
-      stub.end();
-      endHandler();
-    }
-  });
+    stub.on('end', function(){
+        stub.end();
+        if(endHandler && typeof endHandler === "function") {
+            endHandler();
+        }
+    });
 
-  requests.forEach(function(req){
-      stub.write(req);
-  });
+    requests.forEach(function(req){
+        stub.write(req);
+    });
 
-  stub.end();
+    stub.end();
 }
 
 function newPriceRequest(trade) {

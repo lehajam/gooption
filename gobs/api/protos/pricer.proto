@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package gobs;
 
-option go_package = "gobs/api;api_pb";
+option go_package = "github.com/lehajam/gooption/gobs/api;api_pb";
 
 
 import "google/api/annotations.proto";

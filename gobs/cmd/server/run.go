@@ -5,7 +5,7 @@ import (
 
 	"github.com/izumin5210/grapi/pkg/grapiserver"
 
-	"gobs/app/server"
+	"github.com/lehajam/gooption/gobs/app/server"
 )
 
 func run() error {
