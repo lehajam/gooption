@@ -1,12 +1,12 @@
 mutation {
-  # AAPL stock
-  addStock(input: [
-    { ticker: "AAPL" }
-  ]) {
-    stock {
-      id
-    }
-  }
+  #  AAPL stock
+  #  addStock(input: [
+  #    { ticker: "AAPL" }
+  #  ]) {
+  #    stock {
+  #      id
+  #    }
+  #  }
 
   # london office
   addOffice(input: [{name: "london"}]){
@@ -16,7 +16,7 @@ mutation {
   }
 
   # autocall book
-  addBook(input: [{name: "autocall"}]) {
+  addBook(input: [{name: "single stock"}]) {
     book {
       name
     }
@@ -24,31 +24,37 @@ mutation {
 
   # trader
   addTrader(input: [
-    {name: "lehajam boujemaoui", books: [{name: "autocall"}], office: {name: "london"}}
+    {name: "lehajam boujemaoui", books: [{name: "single stock"}], office: {name: "london"}}
   ]){
     trader {
       name
     }
   }
 
-  # AAPL quotes
-  addStockQuote(input: [
-    { index: { id: "0x2" }, datePublished: "2019-10-01", close: 100.0},
-    { index: { id: "0x2" }, datePublished: "2019-10-02", close: 101.0},
-    { index: { id: "0x2" }, datePublished: "2019-10-03", close: 102.0},
-    { index: { id: "0x2" }, datePublished: "2019-10-04", close: 103.0},
-    { index: { id: "0x2" }, datePublished: "2019-10-05", close: 100.0},
-  ]) {
-    stockquote {
-      id
-    }
-  }
+  #  AAPL quotes
+  #  addStockQuote(input: [
+  #    { index: { id: "0x2" }, datePublished: "2019-10-01", close: 100.0},
+  #    { index: { id: "0x2" }, datePublished: "2019-10-02", close: 101.0},
+  #    { index: { id: "0x2" }, datePublished: "2019-10-03", close: 102.0},
+  #    { index: { id: "0x2" }, datePublished: "2019-10-04", close: 103.0},
+  #    { index: { id: "0x2" }, datePublished: "2019-10-05", close: 100.0},
+  #  ]) {
+  #    stockquote {
+  #      id
+  #    }
+  #  }
 
   # european options on AAPL
   addEuropeanContract(input: [
-    {ticker: "AAPL DEC2020", index: [{ id: "0x2" }], currency: "EUR", strike: 100.0, expiry: "2020-12-01", putcall: "call"},
-    {ticker: "AAPL DEC2021", index: [{ id: "0x2" }], currency: "EUR", strike: 100.0, expiry: "2020-12-01", putcall: "call"},
-    {ticker: "AAPL DEC2022", index: [{ id: "0x2" }], currency: "EUR", strike: 100.0, expiry: "2020-12-01", putcall: "call"},
+    {ticker: "AAPL DEC2020", index: [{ id: "0x2" }], currency: "USD", strike: 305.15, expiry: "2020-12-01", putcall: "call"},
+    {ticker: "AAPL DEC2022", index: [{ id: "0x2" }], currency: "USD", strike: 305.15, expiry: "2022-12-01", putcall: "put"},
+    {ticker: "CSCO JUN2020", index: [{ id: "0x4" }], currency: "USD", strike: 44.08, expiry: "2020-06-01", putcall: "call"},
+    {ticker: "CSCO DEC2022", index: [{ id: "0x4" }], currency: "USD", strike: 44.08, expiry: "2022-12-01", putcall: "put"},
+    {ticker: "C JUN2020", index: [{ id: "0xc" }], currency: "USD", strike: 41.8279, expiry: "2020-06-01", putcall: "call"},
+    {ticker: "C DEC2022", index: [{ id: "0xc" }], currency: "USD", strike: 41.8279, expiry: "2022-12-01", putcall: "put"},
+    {ticker: "FB JUN2020", index: [{ id: "0x6" }], currency: "USD", strike: 208.84, expiry: "2020-06-01", putcall: "call"},
+    {ticker: "FB DEC2022", index: [{ id: "0x6" }], currency: "USD", strike: 208.84, expiry: "2022-12-01", putcall: "put"},
+
   ]) {
     europeancontract {
       ticker
@@ -57,24 +63,29 @@ mutation {
 
   # trades on AAPL european options
   addTrade(input: [
-    {tradeDate:"2019-10-01", quantity:1000, contract: { ticker: "AAPL DEC2020" }, trader: { name: "lehajam boujemaoui"}, book: {name: "autocall"}},
-    {tradeDate:"2019-10-01", quantity:1000, contract: { ticker: "AAPL DEC2021" }, trader: { name: "lehajam boujemaoui"}, book: {name: "autocall"}},
-    {tradeDate:"2019-10-01", quantity:1000, contract: { ticker: "AAPL DEC2022" }, trader: { name: "lehajam boujemaoui"}, book: {name: "autocall"}},
+    {tradeDate:"2020-05-01", quantity:1000, contract: { ticker: "AAPL DEC2020" }, trader: { name: "lehajam boujemaoui"}, book: {name: "single stock"}},
+    {tradeDate:"2020-05-01", quantity:1000, contract: { ticker: "AAPL DEC2022" }, trader: { name: "lehajam boujemaoui"}, book: {name: "single stock"}},
+    {tradeDate:"2020-05-01", quantity:1000, contract: { ticker: "CSCO DEC2020" }, trader: { name: "lehajam boujemaoui"}, book: {name: "single stock"}},
+    {tradeDate:"2020-05-01", quantity:1000, contract: { ticker: "CSCO DEC2022" }, trader: { name: "lehajam boujemaoui"}, book: {name: "single stock"}},
+    {tradeDate:"2020-05-01", quantity:1000, contract: { ticker: "C DEC2020" }, trader: { name: "lehajam boujemaoui"}, book: {name: "single stock"}},
+    {tradeDate:"2020-05-01", quantity:1000, contract: { ticker: "C DEC2022" }, trader: { name: "lehajam boujemaoui"}, book: {name: "single stock"}},
+    {tradeDate:"2020-05-01", quantity:1000, contract: { ticker: "FB DEC2020" }, trader: { name: "lehajam boujemaoui"}, book: {name: "single stock"}},
+    {tradeDate:"2020-05-01", quantity:1000, contract: { ticker: "FB DEC2022" }, trader: { name: "lehajam boujemaoui"}, book: {name: "single stock"}},
   ]){
     trade {
       id
     }
   }
 
-  # AAPL quotes
-  addPriceResult(input: [
-    {datePublished:"2020-05-11", contract: { ticker: "AAPL DEC2020" }, value: 1, resultType: "price", source: "gobs"},
-    {datePublished:"2020-05-11", contract: { ticker: "AAPL DEC2020" }, value: 0.5, resultType: "delta", source: "gobs"},
-    {datePublished:"2020-05-11", contract: { ticker: "AAPL DEC2021" }, value: 2, resultType: "price", source: "gobs"},
-    {datePublished:"2020-05-11", contract: { ticker: "AAPL DEC2021" }, value: 1, resultType: "delta", source: "gobs"},
-  ]) {
-     priceresult{
-      id
-    }
-  }
+  #  AAPL quotes
+  #  addPriceResult(input: [
+  #    {datePublished:"2020-05-11", contract: { ticker: "AAPL DEC2020" }, value: 1, resultType: "price", source: "gobs"},
+  #    {datePublished:"2020-05-11", contract: { ticker: "AAPL DEC2020" }, value: 0.5, resultType: "delta", source: "gobs"},
+  #    {datePublished:"2020-05-11", contract: { ticker: "AAPL DEC2021" }, value: 2, resultType: "price", source: "gobs"},
+  #    {datePublished:"2020-05-11", contract: { ticker: "AAPL DEC2021" }, value: 1, resultType: "delta", source: "gobs"},
+  #  ]) {
+  #     priceresult{
+  #      id
+  #    }
+  #  }
 }

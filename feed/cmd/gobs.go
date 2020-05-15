@@ -15,8 +15,6 @@
 package cmd
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -25,7 +23,6 @@ import (
 	api_pb "github.com/lehajam/gooption/gobs/api"
 	"github.com/machinebox/graphql"
 	"github.com/spf13/cobra"
-	"google.golang.org/grpc"
 )
 
 // gobsCmd represents the gobs command
@@ -59,9 +56,9 @@ to quickly create a Cobra application.`,
 		}
 
 		client := graphql.NewClient(graphqlAddr)
-		for _ = range time.Tick(time.Duration(tick) * time.Second) {
+		for range time.Tick(time.Duration(tick) * time.Second) {
 			var queryTradeResp QueryTradeResponse
-			err := graphQuery(client, `{
+			err := RunGraphQLQuery(client, `{
 				queryTrade {
 					contract {
 						ticker
@@ -86,7 +83,7 @@ to quickly create a Cobra application.`,
 				return
 			}
 
-			stream, conn, err := newGobsStream(gobsAddr)
+			stream, conn, err := NewGobsStream(gobsAddr)
 			if conn != nil {
 				defer conn.Close()
 			}
@@ -161,46 +158,6 @@ type PriceResultMutaionResponse struct {
 	} `json:"addPriceResult"`
 }
 
-func graphQuery(client *graphql.Client, queryString string, vars map[string]interface{}, response interface{}) error {
-	// make a request
-	req := graphql.NewRequest(queryString)
-
-	// set header fields
-	req.Header.Set("Cache-Control", "no-cache")
-
-	if vars != nil {
-		for k, v := range vars {
-			req.Var(k, v)
-		}
-	}
-
-	// run it and capture the response
-	err := client.Run(context.Background(), req, response)
-	if err != nil {
-		return err
-	}
-
-	jreq, _ := json.MarshalIndent(response, "", "\t")
-	fmt.Printf("%s \n", jreq)
-
-	return nil
-}
-
-func newGobsStream(grpcAddress string) (api_pb.PricerService_PriceClient, *grpc.ClientConn, error) {
-	conn, err := grpc.Dial(grpcAddress, grpc.WithInsecure())
-	if err != nil {
-		return nil, nil, err
-	}
-
-	grpcClient := api_pb.NewPricerServiceClient(conn)
-	stream, err := grpcClient.Price(context.Background())
-	if err != nil {
-		return nil, conn, err
-	}
-
-	return stream, conn, nil
-}
-
 func gobsResponseHandler(client *graphql.Client, waitc chan struct{}, stream api_pb.PricerService_PriceClient) {
 	for {
 		resp, err := stream.Recv()
@@ -215,7 +172,7 @@ func gobsResponseHandler(client *graphql.Client, waitc chan struct{}, stream api
 
 		var mutationResp PriceResultMutaionResponse
 		vars := map[string]interface{}{"timestamp": time.Now(), "contractID": resp.ClientId, "value": resp.Value, "type": resp.ValueType, "source": "gobs"}
-		err = graphQuery(client, `mutation ($timestamp: DateTime!, $contractID: String!, $value: Float!, $type: String!, $source: String!) {
+		err = RunGraphQLQuery(client, `mutation ($timestamp: DateTime!, $contractID: String!, $value: Float!, $type: String!, $source: String!) {
 			addPriceResult(input: [{
 				datePublished: $timestamp,
 				contract: { ticker: $contractID },
@@ -232,5 +189,7 @@ func gobsResponseHandler(client *graphql.Client, waitc chan struct{}, stream api
 		if err != nil {
 			fmt.Println(err.Error())
 		}
+
+		fmt.Printf("Added %s for contract %s\n", resp.ValueType, resp.ClientId)
 	}
 }
