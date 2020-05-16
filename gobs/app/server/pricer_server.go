@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -79,6 +80,42 @@ func (srv *pricerServiceServerImpl) Price(stream api_pb.PricerService_PriceServe
 			}
 		}
 	}
+}
+
+func (srv *pricerServiceServerImpl) Payoff(ctx context.Context, req *api_pb.PriceRequest) (*api_pb.PayoffResponse, error) {
+	jreq, _ := json.MarshalIndent(req, "", "\t")
+	fmt.Printf("%s \n", jreq)
+
+	// get inputs
+	s, v, r := req.Spot, req.Vol, req.Rate
+	t := time.Unix(int64(req.Expiry), 0).Sub(time.Unix(int64(req.Pricingdate), 0)).Hours() / 24.0 / 365.250
+	mult := mapToMultiplier[strings.ToLower(req.PutCall)]
+
+	var strikes [11]float64
+	for i := 0; i <= 10; i++ {
+		strikes[i] = s * (0.5 + (float64(i) * 0.1))
+	}
+
+	var response = &api_pb.PayoffResponse{
+		Prices: make([]float64, 11),
+		Deltas: make([]float64, 11),
+		Gammas: make([]float64, 11),
+		Vegas:  make([]float64, 11),
+		Rhos:   make([]float64, 11),
+	}
+
+	for i, k := range strikes {
+		d1 := d1(s, k, t, v, r)
+		d2 := d2(d1, v, t)
+
+		response.Prices[i] = bs(s, v, r, k, t, mult)
+		response.Deltas[i] = delta(d1, mult)
+		response.Gammas[i] = gamma(s, t, v, d1)
+		response.Vegas[i] = vega(s, t, d1)
+		response.Rhos[i] = rho(k, t, r, d2, mult)
+	}
+
+	return response, nil
 }
 
 /*

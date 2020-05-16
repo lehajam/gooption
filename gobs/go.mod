@@ -3,6 +3,7 @@ module github.com/lehajam/gooption/gobs
 go 1.14
 
 require (
+	github.com/gogo/protobuf v1.3.1
 	github.com/golang/protobuf v1.3.3
 	github.com/grpc-ecosystem/grpc-gateway v1.8.5
 	github.com/izumin5210/gex v0.5.1

@@ -15,6 +15,32 @@
     "application/json"
   ],
   "paths": {
+    "/payoff": {
+      "post": {
+        "operationId": "Payoff",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/gobsPayoffResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/gobsPriceRequest"
+            }
+          }
+        ],
+        "tags": [
+          "PricerService"
+        ]
+      }
+    },
     "/price": {
       "post": {
         "operationId": "Price",
@@ -44,6 +70,46 @@
     }
   },
   "definitions": {
+    "gobsPayoffResponse": {
+      "type": "object",
+      "properties": {
+        "prices": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "deltas": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "gammas": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "vegas": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "rhos": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      }
+    },
     "gobsPriceRequest": {
       "type": "object",
       "properties": {
