@@ -14,7 +14,7 @@
 
 package main
 
-import "github.com/lehajam/gooption/feed/cmd"
+import "github.com/lehajam/gooption/cmd"
 
 func main() {
 	cmd.Execute()

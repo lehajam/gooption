@@ -8,12 +8,13 @@ import (
 	"github.com/lehajam/gooption/gobs/app/server"
 )
 
-func run() error {
+func Run() error {
 	// Application context
 	ctx := appctx.Global()
 
 	s := grapiserver.New(
 		grapiserver.WithGrpcAddr("tcp", ":5050"),
+		grapiserver.WithGatewayAddr("tcp", ":4200"),
 		grapiserver.WithDefaultLogger(),
 		grapiserver.WithServers(
 			server.NewPricerServiceServer(),

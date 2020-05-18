@@ -68,9 +68,8 @@ func (srv *pricerServiceServerImpl) Price(stream api_pb.PricerService_PriceServe
 		results := map[string]float64{
 			"price": bs(s, v, r, k, t, mult),
 			"delta": delta(d1, mult),
-			"vega":  vega(s, t, d1),
 			"gamma": gamma(s, t, v, d1),
-			"rho":   rho(k, t, r, d2, mult),
+			"theta": theta(s, k, t, v, r, d1, d2, mult),
 		}
 
 		for valueType, value := range results {
@@ -80,6 +79,28 @@ func (srv *pricerServiceServerImpl) Price(stream api_pb.PricerService_PriceServe
 			}
 		}
 	}
+}
+
+func (srv *pricerServiceServerImpl) PnL(ctx context.Context, req *api_pb.PnLRequest) (*api_pb.PnLResponse, error) {
+	jreq, _ := json.MarshalIndent(req, "", "\t")
+	fmt.Printf("%s \n", jreq)
+
+	// get inputs
+	ds := req.Spot - req.EodSpot
+	dt := time.Unix(int64(req.PricingDate), 0).Sub(time.Unix(int64(req.PreviousEodDate), 0)).Hours() / 24.0 / 365.250
+
+	// pnl
+	realized := req.Price - req.EodPrice
+	expected := (req.EodTheta * dt) + (req.EodDelta * ds) + (0.5 * req.EodGamma * req.EodGamma * ds * ds)
+
+	response := &api_pb.PnLResponse{
+		Expected: expected,
+		Realized: realized,
+		Residual: expected - realized,
+		ClientId: req.ClientId,
+	}
+
+	return response, nil
 }
 
 func (srv *pricerServiceServerImpl) Payoff(ctx context.Context, req *api_pb.PriceRequest) (*api_pb.PayoffResponse, error) {
@@ -100,8 +121,7 @@ func (srv *pricerServiceServerImpl) Payoff(ctx context.Context, req *api_pb.Pric
 		Prices: make([]float64, 11),
 		Deltas: make([]float64, 11),
 		Gammas: make([]float64, 11),
-		Vegas:  make([]float64, 11),
-		Rhos:   make([]float64, 11),
+		Thetas: make([]float64, 11),
 	}
 
 	for i, k := range strikes {
@@ -111,8 +131,7 @@ func (srv *pricerServiceServerImpl) Payoff(ctx context.Context, req *api_pb.Pric
 		response.Prices[i] = bs(s, v, r, k, t, mult)
 		response.Deltas[i] = delta(d1, mult)
 		response.Gammas[i] = gamma(s, t, v, d1)
-		response.Vegas[i] = vega(s, t, d1)
-		response.Rhos[i] = rho(k, t, r, d2, mult)
+		response.Thetas[i] = theta(s, k, t, v, r, d1, d2, mult)
 	}
 
 	return response, nil

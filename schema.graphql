@@ -6,8 +6,9 @@ interface Index {
 
 interface Quote {
 	id: ID!
-	datePublished: DateTime @search
+	datePublished: DateTime! @search(by: [hour])
 	index: Index!
+	eod: Boolean @search
 }
 
 interface Contract {
@@ -68,9 +69,20 @@ type Office {
 
 type PriceResult {
 	id: ID!
-	datePublished: DateTime @search
+	datePublished: DateTime! @search(by: [hour])
 	contract: Contract!
 	value: Float!
 	resultType: String! @search(by: [hash])
 	source: String! @search(by: [hash])
+	eod: Boolean @search
+}
+
+type PnLAttribution {
+	id: ID!
+	datePublished: DateTime! @search(by: [hour])
+	contract: Contract!
+	actual: Float!
+	expected: Float!
+	residual: Float!
+	source: String!
 }

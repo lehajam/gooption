@@ -41,6 +41,32 @@
         ]
       }
     },
+    "/pnl": {
+      "post": {
+        "operationId": "PnL",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/gobsPnLResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/gobsPnLRequest"
+            }
+          }
+        ],
+        "tags": [
+          "PricerService"
+        ]
+      }
+    },
     "/price": {
       "post": {
         "operationId": "Price",
@@ -94,19 +120,78 @@
             "format": "double"
           }
         },
-        "vegas": {
+        "thetas": {
           "type": "array",
           "items": {
             "type": "number",
             "format": "double"
           }
+        }
+      }
+    },
+    "gobsPnLRequest": {
+      "type": "object",
+      "properties": {
+        "pricing_date": {
+          "type": "number",
+          "format": "double"
         },
-        "rhos": {
-          "type": "array",
-          "items": {
-            "type": "number",
-            "format": "double"
-          }
+        "previous_eod_date": {
+          "type": "number",
+          "format": "double"
+        },
+        "spot": {
+          "type": "number",
+          "format": "double",
+          "title": "the underlying"
+        },
+        "eod_spot": {
+          "type": "number",
+          "format": "double"
+        },
+        "price": {
+          "type": "number",
+          "format": "double",
+          "title": "the option"
+        },
+        "eod_price": {
+          "type": "number",
+          "format": "double"
+        },
+        "eod_delta": {
+          "type": "number",
+          "format": "double"
+        },
+        "eod_gamma": {
+          "type": "number",
+          "format": "double"
+        },
+        "eod_theta": {
+          "type": "number",
+          "format": "double"
+        },
+        "client_id": {
+          "type": "string"
+        }
+      }
+    },
+    "gobsPnLResponse": {
+      "type": "object",
+      "properties": {
+        "expected": {
+          "type": "number",
+          "format": "double"
+        },
+        "realized": {
+          "type": "number",
+          "format": "double"
+        },
+        "residual": {
+          "type": "number",
+          "format": "double"
+        },
+        "client_id": {
+          "type": "string"
         }
       }
     },

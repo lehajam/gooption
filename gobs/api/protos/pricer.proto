@@ -4,13 +4,19 @@ package gobs;
 
 option go_package = "github.com/lehajam/gooption/gobs/api;api_pb";
 
-
 import "google/api/annotations.proto";
 
 service PricerService {
     rpc Price (stream PriceRequest) returns (stream PriceResponse) {
         option (google.api.http) = {
             post: "/price"
+            body: "*"
+        };
+    }
+
+    rpc PnL (PnLRequest) returns (PnLResponse) {
+        option (google.api.http) = {
+            post: "/pnl"
             body: "*"
         };
     }
@@ -41,10 +47,34 @@ message PriceResponse {
     string client_id = 4;
 }
 
+message PnLRequest {
+    double pricing_date = 1;
+    double previous_eod_date = 2;
+
+    // the underlying
+    double spot = 3;
+    double eod_spot = 4;
+
+    // the option
+    double price = 5;
+    double eod_price = 6;
+    double eod_delta = 7;
+    double eod_gamma = 8;
+    double eod_theta = 9;
+
+    string client_id = 10;
+}
+
+message PnLResponse {
+    double expected = 1;
+    double realized = 2;
+    double residual = 3;
+    string client_id = 4;
+}
+
 message PayoffResponse {
     repeated double prices = 1;
     repeated double deltas = 2;
     repeated double gammas = 3;
-    repeated double vegas = 4;
-    repeated double rhos = 5;
+    repeated double thetas = 4;
 }

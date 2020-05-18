@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	err := run()
+	err := Run()
 	if err != nil {
 		grpclog.Errorf("server was shutdown with errors: %v", err)
 		os.Exit(1)
