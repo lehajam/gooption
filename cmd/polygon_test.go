@@ -1,18 +1,30 @@
 package cmd
 
 import (
-	"fmt"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
+	"io/ioutil"
 	"testing"
 )
 
-func Test_fetchPolygonStocks(t *testing.T) {
-	var tickers PolygonTickers
-	err := tickers.Fetch()
-	assert.NoError(t, err)
-	fmt.Println(tickers)
+func MockPolygonTickers(file string) (*PolygonTickers, error) {
+	var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
+	p := &PolygonTickers{}
+	jsonFile, _ := ioutil.ReadFile(file)
+	err := json.Unmarshal(jsonFile, p)
+	if err != nil {
+		return nil, err
+	}
+
+	return p, nil
+}
+
+func Test_PolygonStocks(t *testing.T) {
 	dgraphClient := NewDgraphClient(":9080")
-	err = tickers.Save(dgraphClient)
+	p, err := MockPolygonTickers("PolygonStock.json")
+	assert.NoError(t, err)
+
+	err = p.Save(dgraphClient)
 	assert.NoError(t, err)
 }

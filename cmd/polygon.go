@@ -39,11 +39,20 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		dgraphClient := NewDgraphClient(":9080")
-		err := fetchPolygonStocks(dgraphClient)
+
+		var stocks PolygonTickers
+		client := NewDgraphClient(":9080")
+
+		err := stocks.Fetch()
 		if err != nil {
-			fmt.Println(err)
+			panic(err)
 		}
+
+		err = stocks.Save(client)
+		if err != nil {
+			panic(err)
+		}
+
 		//graphqlAddr, err := cmd.Flags().GetString("graphql")
 		//if err != nil {
 		//	fmt.Println(err)
@@ -133,40 +142,81 @@ func init() {
 }
 
 type DgraphObject struct {
-	ID          string `json:"uid,omitempty"`
-	GraphqlType string `dgraph:"dgraph.type,omitempty"`
+	ID          string   `json:"uid" dgraph:"uid,omitempty"`
+	GraphqlType []string `json:"dgraph.type" dgraph:"dgraph.type,omitempty"`
 }
 
 type PolygonStock struct {
 	DgraphObject
 
-	Ticker      string `json:"ticker" dgraph:"ReferenceIndex.symbol"`
-	Name        string `json:"name dgraph:"PolygonStock.name"`
-	Market      string `json:"market" dgraph:"PolygonStock.market"`
-	Locale      string `json:"locale" dgraph:"PolygonStock.locale"`
-	Type        string `json:"type" dgraph:"PolygonStock.type"`
-	Currency    string `json:"currency" dgraph:"PolygonStock.currency"`
-	Active      bool   `json:"active" dgraph:"PolygonStock.active"`
-	PrimaryExch string `json:"primaryExch" dgraph:"PolygonStock.primaryexchange"`
-	Updated     string `json:"updated" dgraph:"PolygonStock.updated"`
-}
-
-func (s *PolygonStock) WithDgraphType() *PolygonStock {
-	s.GraphqlType = "ReferenceIndex"
-	return s
+	Ticker      string `json:"ticker" dgraph:"ReferenceIndex.symbol,omitempty"`
+	Name        string `json:"name" dgraph:"PolygonStock.name,omitempty"`
+	Market      string `json:"market" dgraph:"PolygonStock.market,omitempty"`
+	Locale      string `json:"locale" dgraph:"PolygonStock.locale,omitempty"`
+	Type        string `json:"type" dgraph:"PolygonStock.type,omitempty"`
+	Currency    string `json:"currency" dgraph:"Stock.currency,omitempty"`
+	Active      bool   `json:"active" dgraph:"PolygonStock.active,omitempty"`
+	PrimaryExch string `json:"primaryExch" dgraph:"PolygonStock.primaryexchange,omitempty"`
+	Updated     string `json:"updated" dgraph:"PolygonStock.updated,omitempty"`
+	URL         string `json:"url" dgraph:"PolygonStock.url,omitempty"`
 }
 
 type PolygonTickers struct {
-	Tickers []PolygonStock `json:"tickers"`
+	Tickers []PolygonStock `json:"tickers,omitempty"`
 }
 
-func (tickers *PolygonTickers) Fetch() error {
+func (p *PolygonTickers) Fetch() error {
 	var json = jsoniter.ConfigCompatibleWithStandardLibrary
-	jsonFile, _ := ioutil.ReadFile("PolygonStock.json")
-	err := json.Unmarshal(jsonFile, tickers)
+
+	response, err := http.Get(fmt.Sprintf("https://api.polygon.io/v2/reference/tickers?apiKey=%s", APIKEY))
 	if err != nil {
 		return err
 	}
+
+	body, _ := ioutil.ReadAll(response.Body)
+	err = json.Unmarshal(body, p)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (p *PolygonTickers) WithTypeAndID(client *dgo.Dgraph) error {
+	var json = jsoniter.ConfigCompatibleWithStandardLibrary
+
+	symbols := make([]string, len(p.Tickers))
+	for i, t := range p.Tickers {
+		symbols[i] = t.Ticker
+	}
+
+	query := fmt.Sprintf(`{  
+  tickers(func: type(Stock)) @filter(eq(ReferenceIndex.symbol, %s)) {
+    uid
+    ReferenceIndex.symbol
+	dgraph.type
+  }
+}`, symbols)
+
+	stocks, err := client.NewTxn().Query(context.Background(), query)
+	if err != nil {
+		return err
+	}
+
+	if stocks.Metrics.NumUids["uid"] > 0 {
+		err = json.Unmarshal(stocks.GetJson(), p)
+		if err != nil {
+			return err
+		}
+	}
+
+	if stocks.Metrics.NumUids["uid"] != uint64(len(p.Tickers)) {
+		types := []string{"ReferenceIndex", "Stock"}
+		for i := range p.Tickers {
+			p.Tickers[i].GraphqlType = types
+		}
+	}
+
 	return nil
 }
 
@@ -178,98 +228,24 @@ func (p *PolygonTickers) Save(client *dgo.Dgraph) error {
 		TagKey:                 "dgraph",
 	}.Froze()
 
-	txn := client.NewTxn()
-	defer txn.Discard(context.Background())
-
-	for _, stock := range p.Tickers {
-		refIndex, err := json.Marshal(stock.WithDgraphType())
-		fmt.Println(string(refIndex))
-
-		resp, err := txn.Mutate(context.Background(), &api.Mutation{CommitNow: false, SetJson: refIndex})
-		if err != nil {
-			return err
-		}
-
-		fmt.Println(string(resp.GetJson()))
-	}
-
-	return txn.Commit(context.Background())
-}
-
-func fetchPolygonStocks(client *dgo.Dgraph) error {
-	response, err := http.Get(fmt.Sprintf("https://api.polygon.io/v2/reference/tickers?apiKey=%s", APIKEY))
+	err := p.WithTypeAndID(client)
 	if err != nil {
 		return err
 	}
-	body, _ := ioutil.ReadAll(response.Body)
-	fmt.Println()
-	fmt.Println(string(body))
 
-	var jsonIn = jsoniter.ConfigCompatibleWithStandardLibrary
-	var jsonOut = jsoniter.Config{
-		EscapeHTML:             true,
-		SortMapKeys:            true,
-		ValidateJsonRawMessage: true,
-		TagKey:                 "newtag",
-	}.Froze()
+	txn := client.NewTxn()
+	defer txn.Discard(context.Background())
 
-	var polygonStocks PolygonTickers
-	jsonIn.Unmarshal(body, &polygonStocks)
-	stocks, err := jsonOut.Marshal(polygonStocks)
-	fmt.Println()
+	stocks, err := json.Marshal(p)
 	fmt.Println(string(stocks))
-
-	txn := client.NewTxn()
-	defer txn.Discard(context.Background())
-	resp, err := txn.Mutate(context.Background(), &api.Mutation{CommitNow: true, SetJson: stocks})
+	_, err = txn.Mutate(context.Background(), &api.Mutation{CommitNow: true, SetJson: stocks})
 	if err != nil {
 		return err
 	}
 
-	fmt.Println()
-	fmt.Println(string(resp.GetJson()))
 	return nil
 }
 
-//type AddStockResponse struct {
-//	AddStock struct {
-//		Stock []struct {
-//			ID string `json:"id"`
-//		} `json:"stock"`
-//	} `json:"addStock"`
-//}
-//
-//type QueryStockResponse struct {
-//	QueryStock []struct {
-//		ID     string `json:"id"`
-//		Ticker string `json:"ticker"`
-//	} `json:"queryStock"`
-//}
-//
-//type AddStockQuoteResponse struct {
-//	AddStockQuote struct {
-//		Stockquote []struct {
-//			ID string `json:"id"`
-//		} `json:"stockquote"`
-//	} `json:"addStockQuote"`
-//}
-//
-//type Quote struct {
-//	Symbol  string  `json:"symbol"`
-//	DatePublished string  `json:"datePublished"`
-//	refIndex   struct {
-//		Symbol string  `json:"symbol"`
-//	}
-//	Last  string  `json:"bid"`
-//	Bid  string  `json:"bid"`
-//	Ask  string  `json:"ask"`
-//	Low  string  `json:"low"`
-//	High  string  `json:"high"`
-//	Open  string  `json:"open"`
-//	Close  string  `json:"close"`
-//	Volume  string  `json:"volume"`
-//}
-//
 //type PolygonQuote struct {
 //	Ev  string  `json:"ev"`
 //	Sym string  `json:"sym"`

@@ -21,7 +21,7 @@ interface Quote {
 
 interface Contract {
 	refIndex: [ReferenceIndex]
-	currency: Currency!
+	currency: String!
 	trades: [Trade] @hasInverse(field: contract)
 }
 
@@ -33,7 +33,11 @@ interface ValuationResult {
 	source: String! @search(by: [hash])
 }
 
-type Currency implements ReferenceIndex {
+type Stock implements ReferenceIndex {
+	currency: String!
+}
+
+type Fx implements ReferenceIndex {
 	onshore: String! @search(by: [hash])
 	offshore: String! @search(by: [hash])
 }
