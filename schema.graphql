@@ -1,40 +1,70 @@
-interface Index {
-	id: ID!
-	quotes: [Quote] @hasInverse(field: index)
-	contracts: [Contract] @hasInverse(field: index)
+interface ReferenceIndex {
+	symbol: String! @id @search(by: [hash])
+	quotes: [Quote] @hasInverse(field: refIndex)
+	contracts: [Contract] @hasInverse(field: refIndex)
 }
 
 interface Quote {
-	id: ID!
+	symbol: String! @id @search(by: [hash])
 	datePublished: DateTime! @search(by: [hour])
-	index: Index!
-	eod: Boolean @search
+	refIndex: ReferenceIndex!
+	source: String!
+	last: Float!
+	bid: Float
+	ask: Float
+	low: Float
+	high: Float
+	open: Float
+	close: Float
+	volume: Float
 }
 
 interface Contract {
-	ticker: String! @id @search(by: [hash])
-	index: [Index]
-	currency: String!
+	refIndex: [ReferenceIndex]
+	currency: Currency!
 	trades: [Trade] @hasInverse(field: contract)
-	results: [PriceResult] @hasInverse(field: contract)
 }
 
-type StockQuote implements Quote {
-	open: Float
-	close: Float!
-	volume: Float
-	low: Float
-	high: Float
+interface ValuationResult {
+	id: ID!
+	trade: Trade
+	datePublished: DateTime! @search(by: [hour])
+	value: Float!
+	source: String! @search(by: [hash])
 }
 
-type Stock implements Index {
-	ticker: String! @search(by: [hash]) @id
+type Currency implements ReferenceIndex {
+	onshore: String! @search(by: [hash])
+	offshore: String! @search(by: [hash])
 }
 
-type EuropeanContract implements Contract {
+type Option implements Contract {
 	strike: Float!
 	putcall: String!
 	expiry: DateTime! @search
+	optionType: String! @search
+}
+
+type Price implements ValuationResult {
+	_: Boolean
+}
+
+type Delta implements ValuationResult {
+	_: Boolean
+}
+
+type Gamma implements ValuationResult {
+	_: Boolean
+}
+
+type Theta implements ValuationResult {
+	_: Boolean
+}
+
+type PnL implements ValuationResult {
+	actual: Float!
+	expected: Float!
+	residual: Float!
 }
 
 type Trade {
@@ -44,6 +74,7 @@ type Trade {
 	contract: Contract!
 	trader: Trader!
 	book: Book
+	valuations: [ValuationResult] @hasInverse(field: trade)
 }
 
 type Book {
@@ -65,24 +96,4 @@ type Trader implements User {
 type Office {
 	name: String! @search(by: [hash])  @id
 	traders: [Trader] @hasInverse(field: office)
-}
-
-type PriceResult {
-	id: ID!
-	datePublished: DateTime! @search(by: [hour])
-	contract: Contract!
-	value: Float!
-	resultType: String! @search(by: [hash])
-	source: String! @search(by: [hash])
-	eod: Boolean @search
-}
-
-type PnLAttribution {
-	id: ID!
-	datePublished: DateTime! @search(by: [hour])
-	contract: Contract!
-	actual: Float!
-	expected: Float!
-	residual: Float!
-	source: String!
 }
