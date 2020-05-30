@@ -15,18 +15,20 @@
 package cmd
 
 import (
-	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/dgraph-io/dgo/v2"
-	"github.com/dgraph-io/dgo/v2/protos/api"
-	jsoniter "github.com/json-iterator/go"
+	"github.com/lehajam/gooption/core"
+	"github.com/sacOO7/gowebsocket"
 	"github.com/spf13/cobra"
-	"io/ioutil"
 	"net/http"
+	"strings"
+	"time"
 )
 
 const APIKEY = "K105Z7BErGCa0XmV_QWUyy88PCgVp__4NM7hG_"
-const CHANNELS = "AM.AAPL,AM.CSCO,AM.MSFT,AM.FB,AM.G,AM.C"
+
+// const CHANNELS = "AM.AAPL,AM.CSCO,AM.MSFT,AM.FB,AM.G,AM.C"
 
 // polygonCmd represents the polygon command
 var polygonCmd = &cobra.Command{
@@ -39,91 +41,41 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-
-		var stocks PolygonTickers
-		client := NewDgraphClient(":9080")
-
-		err := stocks.Fetch()
+		dgraphAddr, err := cmd.Flags().GetString("dgraph")
 		if err != nil {
-			panic(err)
+			fmt.Println(err)
+			return
 		}
 
-		err = stocks.Save(client)
+		stock, err := cmd.Flags().GetBool("stock")
 		if err != nil {
-			panic(err)
+			fmt.Println(err)
+			return
 		}
 
-		//graphqlAddr, err := cmd.Flags().GetString("graphql")
-		//if err != nil {
-		//	fmt.Println(err)
-		//	return
-		//}
-		//client := graphql.NewClient(graphqlAddr)
-		//
-		//stocks := map[string]string{}
-		//var response QueryStockResponse
-		//err = RunGraphQLQuery(client, "{queryStock { id ticker }}", nil, &response)
-		//for _, stock := range response.QueryStock {
-		//	stocks[stock.Ticker] = stock.ID
-		//}
-		//
-		//socket := gowebsocket.New("wss://socket.polygon.io/stocks") //{host}:{port})
-		//socket.Connect()
-		//
-		//socket.OnTextMessage = func(message string, socket gowebsocket.Socket) {
-		//	if strings.Contains(string(message), "\"ev\":\"AM\"") {
-		//		var quotes []PolygonQuote
-		//		if err := json.Unmarshal([]byte(message), &quotes); err != nil {
-		//			panic(err)
-		//		}
-		//
-		//		fmt.Printf("Received %d quotes\n", len(quotes))
-		//		for _, quote := range quotes {
-		//			if _, exist := stocks[quote.Sym]; !exist {
-		//				var res AddStockResponse
-		//				vars := map[string]interface{}{"ticker": quote.Sym}
-		//				err = RunGraphQLQuery(client,
-		//					`mutation ($ticker: String!) {
-		//						addStock(input: [{ ticker: $ticker }]) {
-		//							stock {
-		//								id
-		//							}
-		//						}
-		//					}`, vars, &res)
-		//				if err != nil {
-		//					fmt.Println(err.Error())
-		//					continue
-		//				}
-		//
-		//				stocks[quote.Sym] = res.AddStock.Stock[0].ID
-		//				fmt.Printf("Added stock %s\n", quote.Sym)
-		//			}
-		//
-		//			var res AddStockQuoteResponse
-		//			vars := map[string]interface{}{"timestamp": time.Now(), "indexID": stocks[quote.Sym], "close": quote.C}
-		//			err = RunGraphQLQuery(client,
-		//				`mutation ($timestamp: DateTime!, $indexID: ID!, $close: Float!) {
-		//					addStockQuote(input: [{ index: { id: $indexID }, datePublished: $timestamp, close: $close}]){
-		//						stockquote {
-		//						  id
-		//						}
-		//					  }
-		//				}`,
-		//				vars, &res)
-		//			if err != nil {
-		//				fmt.Println(err.Error())
-		//				continue
-		//			}
-		//			fmt.Printf("Added quote for stock %s\n", quote.Sym)
-		//		}
-		//	}
-		//}
-		//
-		//socket.SendText(fmt.Sprintf("{\"action\":\"auth\",\"params\":\"%s\"}", APIKEY))
-		//socket.SendText(fmt.Sprintf("{\"action\":\"subscribe\",\"params\":\"%s\"}", CHANNELS))
-		//
-		//waitc := make(chan struct{})
-		//<-waitc
+		quotes, err := cmd.Flags().GetBool("stockquotes")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		dgraph := NewDgraphClient(dgraphAddr)
+
+		if stock {
+			err = FeedStocks(dgraph)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+		}
+
+		if quotes {
+			err = FeedStockQuotes(dgraph)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+		}
 	},
 }
 
@@ -138,16 +90,13 @@ func init() {
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	polygonCmd.Flags().String("graphql", "http://localhost:8080/graphql", "graphql server URL")
-}
-
-type DgraphObject struct {
-	ID          string   `json:"uid" dgraph:"uid,omitempty"`
-	GraphqlType []string `json:"dgraph.type" dgraph:"dgraph.type,omitempty"`
+	polygonCmd.Flags().String("dgraph", ":9080", "dgraph grpc address")
+	polygonCmd.Flags().Bool("stock", false, "feed stocks")
+	polygonCmd.Flags().Bool("stockquotes", false, "feed stock quotes")
 }
 
 type PolygonStock struct {
-	DgraphObject
+	core.GraphQL
 
 	Ticker      string `json:"ticker" dgraph:"ReferenceIndex.symbol,omitempty"`
 	Name        string `json:"name" dgraph:"PolygonStock.name,omitempty"`
@@ -161,103 +110,142 @@ type PolygonStock struct {
 	URL         string `json:"url" dgraph:"PolygonStock.url,omitempty"`
 }
 
-type PolygonTickers struct {
-	Tickers []PolygonStock `json:"tickers,omitempty"`
+type StockQuote struct {
+	RefIndex      string    `json:"sym" dgraph:"Quote.ReferenceIndex,omitempty"`
+	Last          float64   `json:"c" dgraph:"Quote.last,omitempty"`
+	Source        string    `dgraph:"Quote.source,omitempty"`
+	DatePublished time.Time `dgraph:"Quote.datePublished,omitempty"`
 }
 
-func (p *PolygonTickers) Fetch() error {
-	var json = jsoniter.ConfigCompatibleWithStandardLibrary
+type PolygonStockQuote struct {
+	StockQuote
+	core.GraphQL
 
+	Ev  string  `json:"ev"`
+	Sym string  `json:"sym" dgraph:"Quote.symbol,omitempty"`
+	V   int     `json:"v" dgraph:"Quote.volume,omitempty"`
+	Av  int     `json:"av"`
+	Op  float64 `json:"op"`
+	Vw  float64 `json:"vw"`
+	O   float64 `json:"o" dgraph:"Quote.open,omitempty"`
+	C   float64 `json:"c" dgraph:"Quote.close,omitempty"`
+	H   float64 `json:"h" dgraph:"Quote.high,omitempty"`
+	L   float64 `json:"l" dgraph:"Quote.low,omitempty"`
+	A   float64 `json:"a"`
+	S   int64   `json:"s"`
+	E   int64   `json:"e"`
+}
+
+func FeedStocks(client *dgo.Dgraph) error {
 	response, err := http.Get(fmt.Sprintf("https://api.polygon.io/v2/reference/tickers?apiKey=%s", APIKEY))
 	if err != nil {
 		return err
 	}
 
-	body, _ := ioutil.ReadAll(response.Body)
-	err = json.Unmarshal(body, p)
+	var stocks []PolygonStock
+	err = core.ParseFromResponse(response, &stocks)
 	if err != nil {
 		return err
 	}
 
+	stocks, err = withGraphQLStockInfo(client, stocks)
+	if err != nil {
+		return err
+	}
+
+	return core.Save(client, stocks)
+}
+
+func FeedStockQuotes(client *dgo.Dgraph) error {
+	socket := gowebsocket.New("wss://socket.polygon.io/stocks") //{host}:{port})
+
+	socket.OnTextMessage = func(message string, socket gowebsocket.Socket) {
+		if strings.Contains(string(message), "\"ev\":\"AM\"") {
+			// 1 - Get quotes from polygon tick
+			var quotes []PolygonStockQuote
+			err := json.Unmarshal([]byte(message), &quotes)
+			if err != nil {
+				// LOG ERROR
+			}
+
+			// 2 - Add extra info
+			timestamp := time.Now().UTC()
+			for i := 0; i < len(quotes); i++ {
+				quotes[i].Source = "polygon"
+				quotes[i].DatePublished = timestamp
+				quotes[i].Types = []string{"Quote"}
+			}
+
+			// 2 - Save to DB
+			err = core.Save(client, quotes)
+			if err != nil {
+				// LOG ERROR
+			}
+		}
+	}
+
+	// 1 - Get Stocks from DB
+	symbols, err := getAllStockSymbols(client)
+	if err != nil {
+		return err
+	}
+
+	// 2 - Register
+	channels := "AM." + strings.Join(symbols, ",AM.") //AM.AAPL,AM.MSFT ...
+	socket.SendText(fmt.Sprintf("{\"action\":\"auth\",\"params\":\"%s\"}", APIKEY))
+	socket.SendText(fmt.Sprintf("{\"action\":\"subscribe\",\"params\":\"%s\"}", channels))
+	socket.Connect()
+
+	waitc := make(chan struct{})
+	<-waitc
+
 	return nil
 }
 
-func (p *PolygonTickers) WithTypeAndID(client *dgo.Dgraph) error {
-	var json = jsoniter.ConfigCompatibleWithStandardLibrary
-
-	symbols := make([]string, len(p.Tickers))
-	for i, t := range p.Tickers {
-		symbols[i] = t.Ticker
-	}
-
-	query := fmt.Sprintf(`{  
+func withGraphQLStockInfo(client *dgo.Dgraph, stocks []PolygonStock) ([]PolygonStock, error) {
+	query := `
+{
   tickers(func: type(Stock)) @filter(eq(ReferenceIndex.symbol, %s)) {
     uid
     ReferenceIndex.symbol
 	dgraph.type
   }
-}`, symbols)
+}`
 
-	stocks, err := client.NewTxn().Query(context.Background(), query)
+	symbols := make([]string, len(stocks))
+	for i, s := range stocks {
+		symbols[i] = s.Ticker
+	}
+
+	query = fmt.Sprintf(query, symbols)
+	count, err := core.Query(client, query, "uid", &stocks)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if stocks.Metrics.NumUids["uid"] > 0 {
-		err = json.Unmarshal(stocks.GetJson(), p)
-		if err != nil {
-			return err
-		}
-	}
-
-	if stocks.Metrics.NumUids["uid"] != uint64(len(p.Tickers)) {
+	if count != uint64(len(stocks)) {
 		types := []string{"ReferenceIndex", "Stock"}
-		for i := range p.Tickers {
-			p.Tickers[i].GraphqlType = types
+		for i := range stocks {
+			stocks[i].Types = types
 		}
 	}
 
-	return nil
+	return stocks, nil
 }
 
-func (p *PolygonTickers) Save(client *dgo.Dgraph) error {
-	var json = jsoniter.Config{
-		EscapeHTML:             true,
-		SortMapKeys:            true,
-		ValidateJsonRawMessage: true,
-		TagKey:                 "dgraph",
-	}.Froze()
+func getAllStockSymbols(client *dgo.Dgraph) ([]string, error) {
+	query := `
+{
+  tickers(func: type(Stock)) {
+    ReferenceIndex.symbol
+  }
+}`
 
-	err := p.WithTypeAndID(client)
+	var symbols []string
+	_, err := core.Query(client, query, "ReferenceIndex.symbol", &symbols)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	txn := client.NewTxn()
-	defer txn.Discard(context.Background())
-
-	stocks, err := json.Marshal(p)
-	fmt.Println(string(stocks))
-	_, err = txn.Mutate(context.Background(), &api.Mutation{CommitNow: true, SetJson: stocks})
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return symbols, nil
 }
-
-//type PolygonQuote struct {
-//	Ev  string  `json:"ev"`
-//	Sym string  `json:"sym"`
-//	V   int     `json:"v"`
-//	Av  int     `json:"av"`
-//	Op  float64 `json:"op"`
-//	Vw  float64 `json:"vw"`
-//	O   float64 `json:"o"`
-//	C   float64 `json:"c"`
-//	H   float64 `json:"h"`
-//	L   float64 `json:"l"`
-//	A   float64 `json:"a"`
-//	S   int64   `json:"s"`
-//	E   int64   `json:"e"`
-//}
